@@ -230,7 +230,7 @@ def play_webcam(conf, model):   # Stream on cloud (global)
     # st.sidebar.title("Webcam Object Detection")
     import os
     from slack_sdk import WebhookClient
-    import app.params as params
+    import params
 
     def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
         image = frame.to_ndarray(format="bgr24")
@@ -244,7 +244,6 @@ def play_webcam(conf, model):   # Stream on cloud (global)
 
 
         if model is not None:
-            start = time.time()
             # Perform object detection using YOLO model
             res = model.predict(processed_image, conf=conf)
             # print(f'resboxes: {res.boxes}')
@@ -256,7 +255,6 @@ def play_webcam(conf, model):   # Stream on cloud (global)
 
         return av.VideoFrame.from_ndarray(res_plotted, format="bgr24"), res
 
-
     webrtc_streamer(
         key="example",
         # video_transformer_factory=lambda: MyVideoTransformer(conf, model),
@@ -264,31 +262,34 @@ def play_webcam(conf, model):   # Stream on cloud (global)
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         media_stream_constraints={"video": True, "audio": False},
     )
-
     resultholder = st.empty()
 
     client = WebhookClient(os.environ["SLACK_WEBHOOK_URL"])
 
-    result_object = video_frame_callback[1]
-    # get the class id
-    class_ids = result_object.boxes.cls
+    # while webrtc_streamer:
+    #     start = time.time()
+    #     results = []
 
-    # get a dictionay of all class names
-    class_names_dict = result_object.names
+    #     result_object = video_frame_callback[1]
+    #     # get the class id
+    #     class_ids = result_object.boxes.cls
 
-    # display the class
-    results = []
-    for class_id in class_ids:
-        class_name = class_names_dict[int(class_id)]
-        results.append(class_name)
-    if results == []:
-        pass
-    else:
-        if results[0] == 'standing' and results[-1] == 'fall':
-            resultholder.write('## fall')
-            response = client.send(text='Your grandmother fell down!')
-        else:
-            resultholder.write('## Not Falling')
-        end = time.time()
-        time_diff = end - start
-        st.write(time_diff)
+    #     # get a dictionay of all class names
+    #     class_names_dict = result_object.names
+
+    #     # display the class
+    #     results = []
+    #     for class_id in class_ids:
+    #         class_name = class_names_dict[int(class_id)]
+    #         results.append(class_name)
+    #     if results == []:
+    #         pass
+    #     else:
+    #         if results[0] == 'standing' and results[-1] == 'fall':
+    #             resultholder.write('## fall')
+    #             response = client.send(text='Your grandmother fell down!')
+    #         else:
+    #             resultholder.write('## Not Falling')
+    #         end = time.time()
+    #         time_diff = end - start
+    #         st.write(time_diff)
