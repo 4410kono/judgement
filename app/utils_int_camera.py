@@ -8,7 +8,6 @@ from streamlit_webrtc import webrtc_streamer, VideoTransformerBase, webrtc_strea
 import numpy as np
 import av
 import time
-import schedule
 
 
 def _display_detected_frames(conf, model, st_frame, image):
