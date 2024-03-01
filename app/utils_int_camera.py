@@ -216,7 +216,70 @@ def infer_uploaded_webcam(conf, model):
     except Exception as e:
         st.error(f"Error loading video: {str(e)}")
 
-def play_webcam(conf, model):
+def create_processed_image(frame: av.VideoFrame):
+    image = frame.to_ndarray(format="bgr24")
+
+    orig_h, orig_w = image.shape[0:2]
+    width = 720  # Set the desired width for processing
+
+    # cv2.resize used in a forked thread may cause memory leaks
+    processed_image = np.asarray(Image.fromarray(image).resize((width, int(width * orig_h / orig_w))))
+    return processed_image
+
+
+def predict(model, processed_image, conf):
+    res = model.predict(processed_image, conf=conf)
+    return res
+
+def judgement(res):
+    import os
+    from slack_sdk import WebhookClient
+    import app.params
+
+    start = time.time()
+    resultholder = st.empty()
+    client = WebhookClient(os.environ["SLACK_WEBHOOK_URL"])
+    result_object = res[0]
+
+
+    # get the class id
+    class_ids = result_object.boxes.cls
+
+    # get a dictionay of all class names
+    class_names_dict = result_object.names
+
+    # display the class
+    results = []
+    for class_id in class_ids:
+        class_name = class_names_dict[int(class_id)]
+        results.append(class_name)
+    if results == []:
+        pass
+    else:
+        if results[0] == 'standing' and results[-1] == 'fall':
+            resultholder.write('## fall')
+            response = client.send(text='Your grandmother fell down!')
+        else:
+            resultholder.write('## Not Falling')
+        end = time.time()
+        time_diff = end - start
+        st.write(time_diff)
+
+
+def video_frame_callback(res) -> av.VideoFrame:
+
+    # Perform object detection using YOLO model
+        # print(f'resboxes: {res.boxes}')
+
+        # Plot the detected objects on the video frame
+    res_plotted = res[0].plot()
+        # print(f'resplotted: {res_plotted}')
+
+    return av.VideoFrame.from_ndarray(res_plotted, format="bgr24")
+
+
+
+def play_webcam(video_frame_callback):
     """
     Plays a webcam stream on cloud. Detects Objects in real-time using the YOLO object detection model.
 
@@ -227,62 +290,6 @@ def play_webcam(conf, model):
         None
     """
     # st.sidebar.title("Webcam Object Detection")
-
-    def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
-        import os
-        from slack_sdk import WebhookClient
-        import app.params as params
-        image = frame.to_ndarray(format="bgr24")
-
-
-        orig_h, orig_w = image.shape[0:2]
-        width = 720  # Set the desired width for processing
-
-        # cv2.resize used in a forked thread may cause memory leaks
-        processed_image = np.asarray(Image.fromarray(image).resize((width, int(width * orig_h / orig_w))))
-        resultholder = st.empty()
-
-        client = WebhookClient(os.environ["SLACK_WEBHOOK_URL"])
-
-        if model is not None:
-            start = time.time()
-            # Perform object detection using YOLO model
-            res = model.predict(processed_image, conf=conf)
-            # print(f'resboxes: {res.boxes}')
-
-            # Plot the detected objects on the video frame
-            res_plotted = res[0].plot()
-            # print(f'resplotted: {res_plotted}')
-
-            result_object = res[0]
-
-
-            # get the class id
-            class_ids = result_object.boxes.cls
-
-            # get a dictionay of all class names
-            class_names_dict = result_object.names
-
-            # display the class
-            results = []
-            for class_id in class_ids:
-                class_name = class_names_dict[int(class_id)]
-                results.append(class_name)
-            if results == []:
-                pass
-            else:
-                if results[0] == 'standing' and results[-1] == 'fall':
-                    resultholder.write('## fall')
-                    response = client.send(text='Your grandmother fell down!')
-                else:
-                    resultholder.write('## Not Falling')
-                end = time.time()
-                time_diff = end - start
-                st.write(time_diff)
-
-
-        return av.VideoFrame.from_ndarray(res_plotted, format="bgr24")
-
 
     webrtc_streamer(
         key="example",

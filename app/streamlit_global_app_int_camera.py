@@ -1,8 +1,9 @@
 from pathlib import Path
 import streamlit as st
 from ultralytics import YOLO
-from utils_int_camera import infer_uploaded_image, infer_uploaded_video, infer_uploaded_webcam, play_webcam
+from utils_int_camera import *
 from PIL import Image
+import av
 
 # setting page layout
 # st.set_page_config(
@@ -47,7 +48,9 @@ if source_selectbox == "Video": # Video
 elif source_selectbox == "Image": # Image
     infer_uploaded_image(conf=0.5, model=model)
 elif source_selectbox == "Webcam": # Webcam
-    # infer_uploaded_webcam(confidence, model)
-    play_webcam(conf=0.5, model=model)
+    processed_image = create_processed_image(av.VideoFrame)
+    res = predict(model,processed_image, conf=0.5)
+    judgement(res)
+    play_webcam(video_frame_callback(res))
 else:
     st.error("Currently only 'Image' and 'Video' source are implemented")
