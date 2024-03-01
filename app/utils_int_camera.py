@@ -230,6 +230,9 @@ def play_webcam(conf, model):
     # st.sidebar.title("Webcam Object Detection")
 
     def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+        import os
+        from slack_sdk import WebhookClient
+        import app.params as params
         image = frame.to_ndarray(format="bgr24")
 
 
@@ -238,8 +241,12 @@ def play_webcam(conf, model):
 
         # cv2.resize used in a forked thread may cause memory leaks
         processed_image = np.asarray(Image.fromarray(image).resize((width, int(width * orig_h / orig_w))))
+        resultholder = st.empty()
+
+        client = WebhookClient(os.environ["SLACK_WEBHOOK_URL"])
 
         if model is not None:
+            start = time.time()
             # Perform object detection using YOLO model
             res = model.predict(processed_image, conf=conf)
             # print(f'resboxes: {res.boxes}')
@@ -258,9 +265,21 @@ def play_webcam(conf, model):
             class_names_dict = result_object.names
 
             # display the class
-            for box, class_id in zip(bounding_boxes, class_ids):
+            results = []
+            for class_id in class_ids:
                 class_name = class_names_dict[int(class_id)]
-                st.text(f"Object: {class_name}")
+                results.append(class_name)
+            if results == []:
+                pass
+            else:
+                if results[0] == 'standing' and results[-1] == 'fall':
+                    resultholder.write('## fall')
+                    response = client.send(text='Your grandmother fell down!')
+                else:
+                    resultholder.write('## Not Falling')
+                end = time.time()
+                time_diff = end - start
+                st.write(time_diff)
 
 
         return av.VideoFrame.from_ndarray(res_plotted, format="bgr24")

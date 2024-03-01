@@ -4,3 +4,4 @@ app/streamlit_local_app_ext_camera.py
 **/.DS_Store
 
 app/__pycache__
+app/params.py

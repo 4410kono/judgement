@@ -11,7 +11,7 @@ import base64
 import time
 
 
-def _display_detected_frames(conf, model, st_count, st_frame, image):
+def _display_detected_frames(conf, model, st_frame, image):
     """
     Display the detected objects on a video frame using the YOLOv8 model.
     :param conf (float): Confidence threshold for object detection.
@@ -24,14 +24,24 @@ def _display_detected_frames(conf, model, st_count, st_frame, image):
     #image = cv2.resize(image, (720, int(720 * (9 / 16))))
 
     # Predict the objects in the image using YOLOv8 model
+
     res = model.predict(image, conf=conf)
 
     res_plotted = res[0].plot()
+
+    # if 'fall' in results:
+    #     last_result = st.text('Not falling')
+    # else:
+    #     last_result = st.text('Falling') # [check] display the result on the screen of streamlit
+            #response = client.send(text='Your grandmother fell down!')
+
+
     st_frame.image(res_plotted,
                    caption='Detected Video',
                    channels="BGR",
                    use_column_width=True
                    )
+    return res
 
 
 # # @st.cache_resource
@@ -145,37 +155,65 @@ def process_frame(frame):   #TONY asked ChatGPT to lower resolution of input vid
     return frame
 
 
-def infer_uploaded_webcam(conf, model):      # Stream with local camera
+def infer_uploaded_webcam(conf, model):
     """
     Execute inference for webcam (Plays a webcam stream on local).
     :param conf: Confidence of YOLOv8 model
     :param model: An instance of the `YOLOv8` class containing the YOLOv8 model.
     :return: None
     """
+    import os
+    from slack_sdk import WebhookClient
     try:
         flag = st.button(
             label="Stop running"
         )
         vid_cap = cv2.VideoCapture(1)  # local camera
-        st_count = st.empty()
         st_frame = st.empty()
+        resultholder = st.empty()
+
+        client = WebhookClient(os.environ["SLACK_WEBHOOK_URL"])
 
         while not flag:
             while vid_cap.isOpened():
-                success, image = vid_cap.read()
-                # image = process_frame(image)  #Tony asked ChatGPT
-                # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  #Tony asked ChatGPT
-                if success:
-                    _display_detected_frames(
-                        conf,
-                        model,
-                        st_count,
-                        st_frame,
-                        image
-                    )
+                start = time.time()
+                results = []
+                for i in range(10):
+                    success, image = vid_cap.read()
+                    # image = process_frame(image)  #Tony asked ChatGPT
+                    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  #Tony asked ChatGPT
+                    res = _display_detected_frames(
+                                conf,
+                                model,
+                                st_frame,
+                                image
+                            )
+                    result_object = res[0]
+
+                    # get the class id
+                    class_ids = result_object.boxes.cls
+
+                    # get a dictionay of all class names
+                    class_names_dict = result_object.names
+
+                    # display the class
+                    for class_id in class_ids:
+                        class_name = class_names_dict[int(class_id)]
+                        results.append(class_name)
+                if results == []:
+                    pass
                 else:
-                    vid_cap.release()
-                    break
+                    if results[0] == 'standing' and results[-1] == 'fall':
+                        resultholder.write('## fall')
+                        response = client.send(text='Your grandmother fell down!')
+                    else:
+                        resultholder.write('## Not Falling')
+                end = time.time()
+                time_diff = end - start
+                st.write(time_diff)
+            else:
+                st.text('finish')
+                vid_cap.release()
     except Exception as e:
         st.error(f"Error loading video: {str(e)}")
 
@@ -192,6 +230,9 @@ def play_webcam(conf, model):   # Stream on cloud (global)
     # st.sidebar.title("Webcam Object Detection")
 
     def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+        import os
+        from slack_sdk import WebhookClient
+        import app.params as params
         image = frame.to_ndarray(format="bgr24")
 
 
@@ -200,8 +241,12 @@ def play_webcam(conf, model):   # Stream on cloud (global)
 
         # cv2.resize used in a forked thread may cause memory leaks
         processed_image = np.asarray(Image.fromarray(image).resize((width, int(width * orig_h / orig_w))))
+        resultholder = st.empty()
+
+        client = WebhookClient(os.environ["SLACK_WEBHOOK_URL"])
 
         if model is not None:
+            start = time.time()
             # Perform object detection using YOLO model
             res = model.predict(processed_image, conf=conf)
             # print(f'resboxes: {res.boxes}')
@@ -209,7 +254,31 @@ def play_webcam(conf, model):   # Stream on cloud (global)
             # Plot the detected objects on the video frame
             res_plotted = res[0].plot()
             # print(f'resplotted: {res_plotted}')
+            result_object = res[0]
 
+
+            # get the class id
+            class_ids = result_object.boxes.cls
+
+            # get a dictionay of all class names
+            class_names_dict = result_object.names
+
+            # display the class
+            results = []
+            for class_id in class_ids:
+                class_name = class_names_dict[int(class_id)]
+                results.append(class_name)
+            if results == []:
+                pass
+            else:
+                if results[0] == 'standing' and results[-1] == 'fall':
+                    resultholder.write('## fall')
+                    response = client.send(text='Your grandmother fell down!')
+                else:
+                    resultholder.write('## Not Falling')
+                end = time.time()
+                time_diff = end - start
+                st.write(time_diff)
 
         return av.VideoFrame.from_ndarray(res_plotted, format="bgr24")
 
