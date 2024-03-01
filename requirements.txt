@@ -8,8 +8,6 @@ pygame
 streamlit
 streamlit_webrtc
 slack_sdk
-os
-time
 torch
 
 torchvision
