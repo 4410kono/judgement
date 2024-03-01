@@ -48,7 +48,7 @@ if source_selectbox == "Video": # Video
 elif source_selectbox == "Image": # Image
     infer_uploaded_image(conf=0.5, model=model)
 elif source_selectbox == "Webcam": # Webcam
-    processed_image = create_processed_image(av.VideoFrame)
+    processed_image = create_processed_image()
     res = predict(model,processed_image, conf=0.5)
     judgement(res)
     play_webcam(video_frame_callback(res))
